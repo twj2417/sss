@@ -1,0 +1,100 @@
+# Data
+*.h5
+*.npy
+*.s
+*.rec
+*.txt
+*.ve
+*.v
+*.trans
+*.img
+*.Cdf
+
+#Header
+*.hs
+*.hdr
+*.hv
+*.ahv
+*.Cdh
+
+# Other
+*.m
+sm
+run.sh
+start.py
+data2numpy.py
+run0809.py
+__init__.pyc
+*.par
+
+# jupyter notebooks 
+*.ipynb
+# Prerequisites
+*.d
+
+# Configuration files
+recon.json
+*.json
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# debug folder
+debug/
+
+# Distribution / packaging
+*.egg-info/
+/dist
+/.vscode
+
+*__pycache__/
+
+.pytest_cache/
+
+.cache/
+.vscode/
+.vs/
+#IDEs
+/.vscode
+/.vs
+/.idea
+
+
+# venv
+venv
+
+# hdf5 files
+*.h5
+
+# jupyter files
+*.ipynb
+
+# tmporal folder
+tmp*
