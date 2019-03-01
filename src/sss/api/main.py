@@ -8,7 +8,7 @@ def scatter_correction(config):
     scanner = get_scanner(config['scanner'])
     lors = get_all_lors_id(scanner.nb_rings*scanner.blocks[0].grid[2]*scanner.nb_detectors_per_ring)
     sinogram = lm2sino(config['listmode']['path'],scanner)
-    fraction = get_scatter_fraction(config)
+    fraction = get_scatter_fraction(config,sinogram,lors)
     corrected_sinogram = sinogram*(1-fraction)
     corrected_data = sino2lm(scanner,corrected_sinogram,lors)
     result = {'fst':corrected_data[:,0:3],'snd':corrected_data[:,3:6],'weight':corrected_data[:,6]}

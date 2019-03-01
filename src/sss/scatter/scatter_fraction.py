@@ -9,7 +9,7 @@ from scipy.special import ndtr
 from numba import jit,cuda
 
 @jit
-def scatter_fraction(config):
+def scatter_fraction(config,sinogram,lors):
     emission_image = get_image(config['emission'])
     u_map = get_image(config['transmission'])
     scanner = get_scanner(config['scanner'])
@@ -18,22 +18,19 @@ def scatter_fraction(config):
     crystal_position = get_all_crystal_position(scanner)
     sumup_emission = pre_sumup_of_emission(emission_image,crystal_position,scatter_position,config)
     atten = pre_atten(emission_image,u_map,crystal_position,scatter_position,config)   
+    index = np.where(sinogram>0)[0]
     return loop_all_lors(scanner.nb_detectors,scanner.nb_detectors_per_ring,scanner.nb_blocks_per_ring,scanner.blocks[0].grid,scanner.blocks[0].size,scatter_position,crystal_position,
-                config['energy']['window'][0],config['energy']['window'][1],config['energy']['resolution'],atten,sumup_emission,num_scatter,u_map.data,u_map.size,u_map.data.shape)
+                config['energy']['window'][0],config['energy']['window'][1],config['energy']['resolution'],atten,sumup_emission,num_scatter,u_map.data,u_map.size,u_map.data.shape,index,lors)
 
 
 @jit(nopython=True)
-def loop_all_lors(nb_detectors,nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,scatter_position,crystal_position,low_energy,high_energy,resolution,atten,sumup_emission,num_scatter,u_map,size,shape):
-    n = 0
+def loop_all_lors(nb_detectors,nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,scatter_position,crystal_position,low_energy,high_energy,resolution,atten,sumup_emission,num_scatter,u_map,size,shape,sinogram,lors):
     scatter_ab = np.zeros((int(nb_detectors*(nb_detectors-1)/2),1))
-    for a in range(nb_detectors):
-        if a%100 ==0:
-            print(a)
-        for b in range(a):
-            scatter_ab[n] = loop_all_s(scatter_position,crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,sumup_emission[a*num_scatter:(a+1)*num_scatter],
-                            sumup_emission[b*num_scatter:(b+1)*num_scatter],atten[a*num_scatter:(a+1)*num_scatter],atten[b*num_scatter:(b+1)*num_scatter],
-                            nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,u_map,size,shape)
-            n = n+1
+    for i in range(sinogram.size):
+        a = int(lors[sinogram[i],0])
+        b = int(lors[sinogram[i],1])
+        scatter_ab[sinogram[i]] = loop_all_s(scatter_position,crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,sumup_emission[a*num_scatter:(a+1)*num_scatter],
+        sumup_emission[b*num_scatter:(b+1)*num_scatter],atten[a*num_scatter:(a+1)*num_scatter],atten[b*num_scatter:(b+1)*num_scatter],nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,u_map,size,shape)
     return scatter_ab
 
 
