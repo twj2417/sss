@@ -13,7 +13,7 @@ def pre_all_scatter_position(emission_image):
     size_voxel = emission_image.size/emission_image.grid
     step = np.floor(50/size_voxel)
     time = np.ceil(emission_image.grid/step)
-    position = np.zeros((int(time[0]*time[1]*time[2]),3))
+    position = np.zeros((int(time[0]*time[1]*time[2]),3),dtype=np.float32)
     n = 0
     for x in range(int(time[0])):
         for y in range(int(time[1])):
@@ -49,7 +49,7 @@ def pre_atten(emission_image,u_map,p1,p2,config):
     return weight
 
 def get_lors(P1,P2):
-    lors = np.ones((P1.shape[0]*P2.shape[0],7))
+    lors = np.ones((P1.shape[0]*P2.shape[0],7),dtype=np.float32)
     lors[:,0] = np.tile(P1[:,0].reshape(-1,1),P2.shape[0]).flatten()
     lors[:,1] = np.tile(P1[:,1].reshape(-1,1),P2.shape[0]).flatten()
     lors[:,2] = np.tile(P1[:,2].reshape(-1,1),P2.shape[0]).flatten()
@@ -74,5 +74,5 @@ def get_voxel_volume(image):
 
 def get_all_crystal_position(scanner):
     crystal_id = np.arange(scanner.nb_detectors)
-    return get_center(scanner,crystal_id)
+    return get_center(scanner,crystal_id).astype(np.float32)
 

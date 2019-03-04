@@ -1,7 +1,7 @@
-from numba import jit
+from numba import jit,cuda
 import math
 
-@jit(nopython=True)
+@cuda.jit(device=True)
 def fkn(A,S,B,u_map,size,shape,Z):
     """
     Differential cross section:A to S, and scattering to B
@@ -15,13 +15,13 @@ def fkn(A,S,B,u_map,size,shape,Z):
     sigma = math.pi*Z*(52/9-3*math.log(3))
     return differential_value/sigma*u_map[grid_S0,grid_S1,grid_S2]
 
-@jit(nopython=True)
+@cuda.jit(device=True)
 def get_scatter_cos_theta(A,S,B):
     dis_ab = distance_a2b(A[0],A[1],A[2],B[0],B[1],B[2])
     dis_as = distance_a2b(A[0],A[1],A[2],S[0],S[1],S[2])
     dis_sb = distance_a2b(S[0],S[1],S[2],B[0],B[1],B[2])
     return -(dis_as**2+dis_sb**2-dis_ab**2)/(2*dis_as*dis_sb)
 
-@jit(nopython=True)
+@cuda.jit(device=True)
 def distance_a2b(x1,y1,z1,x2,y2,z2):
     return ((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)**0.5
