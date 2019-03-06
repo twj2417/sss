@@ -25,6 +25,8 @@ def scatter_fraction(config,sinogram,lors,scanner):
                     np.array(scanner.blocks.size,dtype=np.int32),scatter_position,crystal_position,config['energy']['window'][0],
                     config['energy']['window'][1],config['energy']['resolution'],atten,sumup_emission,scatter_position.shape[0],
                     u_map.data,np.array(u_map.size,dtype=np.float32),np.array(u_map.data.shape,dtype=np.float32),lors_part,scatter)
+    print(np.max(scatter))
+    print(np.mean(scatter))
     total_scatter = np.zeros((int(scanner.nb_detectors*(scanner.nb_detectors-1)/2),1),dtype=np.float32)
     total_scatter[index] = scatter
     return total_scatter*0.3/np.max(total_scatter)
@@ -43,7 +45,7 @@ def scatter_fraction(config,sinogram,lors,scanner):
 def loop_all_lors(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,scatter_position,crystal_position,low_energy,high_energy,resolution,atten,sumup_emission,num_scatter,u_map,size,shape,lors,scatter_ab):
     # scatter_ab = np.zeros((int(nb_detectors*(nb_detectors-1)/2),1))
     c, j = cuda.grid(2)
-    i = 256 * 32 * c + j
+    i = 512 * 16 * c + j
     if i <scatter_ab.shape[0]:
         a = int(lors[i,0])
         b = int(lors[i,1])
@@ -59,12 +61,12 @@ def loop_all_s(scatter_position,A,B,low_energy,high_energy,resolution,sumup_emis
         S = scatter_position[i,:]
         cos_theta = get_scatter_cos_theta(A,S,B)
         scattered_energy = 511/(2-cos_theta)
-        Ia = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
-                      atten_s2a[i]*atten_s2b[i]*scattered_energy/511*sumup_emission_s2a[i])
-        Ib = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
-                      atten_s2a[i]*atten_s2b[i]*scattered_energy/511*sumup_emission_s2b[i])
+        I = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
+            atten_s2a[i]*atten_s2b[i]*scattered_energy/511*(sumup_emission_s2a[i]+sumup_emission_s2b[i]))
+        # Ib = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
+        #               atten_s2a[i]*atten_s2b[i]*scattered_energy/511*sumup_emission_s2b[i])
         scatter_ab += (project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,S,A)*project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,S,B)
-                      *fkn(A,S,B,u_map,size,shape,10.0)*(Ia+Ib)/4/math.pi/(distance_a2b(S[0],S[1],S[2],A[0],A[1],A[2]))**2/(distance_a2b(S[0],S[1],S[2],B[0],B[1],B[2]))**2)   
+                      *fkn(A,S,B,u_map,size,shape,10.0)*I/4/math.pi/(distance_a2b(S[0],S[1],S[2],A[0],A[1],A[2]))**2/(distance_a2b(S[0],S[1],S[2],B[0],B[1],B[2]))**2)   
     return scatter_ab
 
 @cuda.jit(device=True)
@@ -94,7 +96,9 @@ def project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,
     calculate LOR ab projection area on pb,which is crystal area*cos(theta)
     """   
     theta_normal = get_block_theta(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,pb)
-    theta = -get_scatter_cos_theta(pa,pb,(pb-np.array([math.cos(theta_normal),math.sin(theta_normal),0])))
+    # theta = -get_scatter_cos_theta(pa,pb,(pb-np.array([math.cos(theta_normal),math.sin(theta_normal),0],dtype=np.float32)))
+    theta = (((pb-pa)[0]*math.cos(theta_normal)+(pb-pa)[1]*math.sin(theta_normal))
+                    /distance_a2b(pa[0],pa[1],pa[2],pb[0],pb[1],pb[2])) 
     return size_block[1]*size_block[2]/grid_block[1]/grid_block[2]*theta
 
 @cuda.jit(device=True)
