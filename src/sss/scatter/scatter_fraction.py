@@ -97,7 +97,7 @@ def project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,
     """   
     theta_normal = get_block_theta(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,pb)
     # theta = -get_scatter_cos_theta(pa,pb,(pb-np.array([math.cos(theta_normal),math.sin(theta_normal),0],dtype=np.float32)))
-    theta = (((pb-pa)[0]*math.cos(theta_normal)+(pb-pa)[1]*math.sin(theta_normal))
+    theta = (((pb[0]-pa[0])*math.cos(theta_normal)+(pb[1]-pa[1])*math.sin(theta_normal))
                     /distance_a2b(pa[0],pa[1],pa[2],pb[0],pb[1],pb[2])) 
     return size_block[1]*size_block[2]/grid_block[1]/grid_block[2]*theta
 
