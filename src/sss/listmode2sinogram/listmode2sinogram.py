@@ -1,11 +1,8 @@
 import numpy as np
 import math
-import matplotlib.pyplot as plt
-import pylab
-import gc
-from srf.external.stir.function import get_scanner
-from srf.io.listmode import load_h5,save_h5
 from numba import jit
+import h5py
+from typing import Dict
 
 def norm(x):
     return np.sqrt(np.square(x[:,0])+np.square(x[:,1]))
@@ -25,7 +22,7 @@ def block_id(event,nb_detectors_per_ring,block_grid_y,num_block):
     return np.floor(fixed_theta/360*num_block)
 
 def crystal_id(scanner,event):
-    id_block = block_id(event,scanner.nb_detectors_per_ring,scanner.blocks[0].grid[1],scanner.nb_blocks_per_ring)
+    id_block = block_id(event,scanner.nb_detectors_per_ring,scanner.blocks.shape[1],scanner.nb_blocks_per_ring)
     block_center_x = (scanner.inner_radius+scanner.outer_radius)/2*np.cos(2*np.pi*id_block/scanner.nb_blocks_per_ring)
     block_center_y = (scanner.inner_radius+scanner.outer_radius)/2*np.sin(2*np.pi*id_block/scanner.nb_blocks_per_ring)
     vector_radial = np.hstack((np.cos(2*(np.pi)*id_block/scanner.nb_blocks_per_ring),np.sin(2*(np.pi)*id_block/scanner.nb_blocks_per_ring)))
@@ -33,12 +30,12 @@ def crystal_id(scanner,event):
     dist_vector = np.hstack((block_center_x.reshape(-1,1),block_center_y.reshape(-1,1)))-event[:,:2]
     dist = (dist_vector*vector_radial).sum(axis=1).reshape(-1,1)
     pro_point = np.tile(dist,(1,2))*vector_radial+event[:,:2]
-    edge_block = np.hstack((block_center_x.reshape(-1,1),block_center_y.reshape(-1,1)))-vector_tang*scanner.blocks[0].size[1]/2
-    id_crystal = np.floor(norm(pro_point-edge_block)/scanner.blocks[0].size[1]*scanner.blocks[0].grid[1])   
-    return id_block*scanner.blocks[0].grid[1]+id_crystal.reshape(-1,1)
+    edge_block = np.hstack((block_center_x.reshape(-1,1),block_center_y.reshape(-1,1)))-vector_tang*scanner.blocks.size[1]/2
+    id_crystal = np.floor(norm(pro_point-edge_block)/scanner.blocks.size[1]*scanner.blocks.shape[1])   
+    return id_block*scanner.blocks.shape[1]+id_crystal.reshape(-1,1)
 
 def ring_id(scanner,event_z):
-    return np.floor((event_z+scanner.blocks[0].size[2]*scanner.nb_rings/2*np.ones_like(event_z))/scanner.axial_length*scanner.nb_rings*scanner.blocks[0].grid[1])
+    return np.floor((event_z+scanner.blocks.size[2]*scanner.nb_rings/2*np.ones_like(event_z))/scanner.axial_length*scanner.nb_rings*scanner.blocks.shape[1])
 
 def position2detectorid(scanner, event):
     ring_id1 = ring_id(scanner,event[:,2]).reshape(-1,1)
@@ -59,7 +56,7 @@ def detectorid(scanner,events):
     return change_id(id_event)
 
 def cal_sinogram(list_mode_data,scanner):
-    total_num_crystal = scanner.nb_rings*scanner.blocks[0].grid[2]*scanner.nb_detectors_per_ring
+    total_num_crystal = scanner.nb_rings*scanner.blocks.shape[2]*scanner.nb_detectors_per_ring
     weight = np.zeros((int(total_num_crystal*(total_num_crystal-1)/2),1))
     for i in range(int(list_mode_data.shape[0])):
         pos = int((list_mode_data[i,0]-1)*list_mode_data[i,0]/2+list_mode_data[i,1])
@@ -94,10 +91,10 @@ def get_crystal_z(ring_id,grid_block,size_block,nb_rings):
 def get_center(scanner,crystal_id_whole_scanner):
     ring_id = np.floor(crystal_id_whole_scanner/scanner.nb_detectors_per_ring)
     crystal_per_ring_id = crystal_id_whole_scanner - ring_id*scanner.nb_detectors_per_ring
-    block_id = crystal_per_ring_id//scanner.blocks[0].grid[1]
-    crystal_id = crystal_per_ring_id%scanner.blocks[0].grid[1]
-    center_xy = get_crystal_xy(np.array(scanner.blocks[0].grid),scanner.nb_blocks_per_ring,crystal_id,block_id,scanner.inner_radius,np.array(scanner.blocks[0].size))
-    center_z = get_crystal_z(ring_id,np.array(scanner.blocks[0].grid),np.array(scanner.blocks[0].size),scanner.nb_rings)
+    block_id = crystal_per_ring_id//scanner.blocks.shape[1]
+    crystal_id = crystal_per_ring_id%scanner.blocks.shape[1]
+    center_xy = get_crystal_xy(np.array(scanner.blocks.shape),scanner.nb_blocks_per_ring,crystal_id,block_id,scanner.inner_radius,np.array(scanner.blocks.size))
+    center_z = get_crystal_z(ring_id,np.array(scanner.blocks.shape),np.array(scanner.blocks.size),scanner.nb_rings)
     return np.hstack((center_xy,center_z.reshape(center_z.size,1)))
 
 def lm2sino(filename,scanner):
@@ -113,3 +110,27 @@ def sino2lm(scanner,sinogram,lors):
     all_position[:,:3] = get_center(scanner,lors[index,0])
     all_position[:,3:6] = get_center(scanner,lors[index,1])
     return np.hstack((all_position,sinogram[index].reshape(-1,1)))
+
+
+
+__all__ = []
+
+DEFAULT_GROUP_NAME = 'listmode_data'
+
+DEFAULT_COLUMNS = ['fst', 'snd', 'weight', 'tof']
+
+
+def load_h5(path, group_name=DEFAULT_GROUP_NAME)-> Dict[str, np.ndarray]:
+    with h5py.File(path, 'r') as fin:
+        dataset = fin[group_name]
+        result = {}
+        for k in DEFAULT_COLUMNS:
+            if k in dataset:
+                result[k] = np.array(dataset[k])
+        return result
+
+def save_h5(path, dct, group_name=DEFAULT_GROUP_NAME):
+    with h5py.File(path, 'w') as fout:
+        group = fout.create_group(group_name)
+        for k, v in dct.items():
+            group.create_dataset(k, data=v, compression="gzip")

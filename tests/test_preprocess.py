@@ -1,7 +1,7 @@
-from sss.preprocess import (pre_all_scatter_position,pre_sumup_of_emission,pre_atten,get_projection_data,get_coordinate,
-              get_image,get_voxel_volume,get_all_crystal_position,get_crystal_xy,get_crystal_z,get_center)
-from srf.data import Image
-from srf.external.stir.function import get_scanner
+from sss.preprocess import (pre_all_scatter_position,pre_sumup_of_emission,pre_atten,get_coordinate,
+              get_image,get_voxel_volume,get_all_crystal_position)
+import srfnef as nef
+from sss.scatter import get_scanner
 from doufo.tensor.tensor import all_close
 import numpy as np
 import pytest
@@ -11,7 +11,7 @@ def get_emission_image():
     data = np.zeros((100,100,100))
     center = np.array([0,0,0])
     size = np.array([100,150,200])
-    return Image(data,center,size)
+    return nef.Image(data,center,size)
 
 def make_scanner():
     config = {"scanner": {
