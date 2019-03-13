@@ -2,7 +2,7 @@ from numba import jit,cuda
 import math
 
 @cuda.jit(device=True)
-def fkn(A,S,B,u_map,size,shape,Z):
+def fkn(A,S,B,u_map,size,shape):
     """
     Differential cross section:A to S, and scattering to B
     """
@@ -12,7 +12,9 @@ def fkn(A,S,B,u_map,size,shape,Z):
     grid_S2 = int((S[2]/size[2]+0.5)*shape[2])
     differential_value = (1.0/(2.0-cos_asb)**2*((1.0+cos_asb**2)/2.0
                           +(1.0-cos_asb)**2/2.0/(2.0-cos_asb)))
-    sigma = math.pi*Z*(52.0/9.0-3.0*math.log(3.0))
+    # Z = u_map[grid_S0,grid_S1,grid_S2]*(-416)+14
+    Z = u_map[grid_S0,grid_S1,grid_S2]*1000+0.4
+    sigma = math.pi*Z*(40.0/9.0-3.0*math.log(3.0))
     return differential_value/sigma*u_map[grid_S0,grid_S1,grid_S2]
 
 @cuda.jit(device=True)

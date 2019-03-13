@@ -2,13 +2,14 @@ import math
 import numpy as np
 from scipy import integrate
 from .kn_formula import get_scatter_cos_theta,fkn
-from ..preprocess import pre_all_scatter_position,pre_atten,pre_sumup_of_emission,get_all_crystal_position,get_image
+from ..preprocess import pre_all_scatter_position,pre_atten,pre_lors_atten,pre_sumup_of_emission,get_all_crystal_position,get_image
 # from srf.external.stir.function import get_scanner
 from ..io import get_data
 from scipy.special import ndtr
 from numba import jit,cuda
 import srfnef as nef
 import time
+import sys
 
 @jit
 def scatter_fraction(config,sinogram,lors,scanner):
@@ -16,57 +17,60 @@ def scatter_fraction(config,sinogram,lors,scanner):
     u_map = get_image(config['transmission'])
     scatter_position = pre_all_scatter_position(emission_image)
     crystal_position = get_all_crystal_position(scanner)
-    sumup_emission = pre_sumup_of_emission(emission_image,crystal_position,scatter_position)
-    atten = pre_atten(u_map,crystal_position,scatter_position)  
+    sumup_emission = pre_sumup_of_emission(emission_image,crystal_position,scatter_position,config)
+    atten = pre_atten(u_map,crystal_position,scatter_position,config)
     index = np.where(sinogram>0)[0].astype(np.int32)
+    atten_lors = pre_lors_atten(u_map,crystal_position[lors[index,0]],crystal_position[lors[index,1]],config).reshape(-1,1)  
     scatter = np.zeros((index.size,1),dtype=np.float32)
+    scale = np.zeros((index.size,1),dtype=np.float32)
     lors_part = lors[index,:]
     loop_all_lors[(512,512),(16,16)](scanner.nb_detectors_per_ring,scanner.nb_blocks_per_ring,np.array(scanner.blocks.shape,dtype=np.int32),
                     np.array(scanner.blocks.size,dtype=np.int32),scatter_position,crystal_position,config['energy']['window'][0],
-                    config['energy']['window'][1],config['energy']['resolution'],atten,sumup_emission,scatter_position.shape[0],
-                    u_map.data,np.array(u_map.size,dtype=np.float32),np.array(u_map.data.shape,dtype=np.float32),lors_part,scatter)
-    print(np.max(scatter))
-    print(np.mean(scatter))
+                    config['energy']['window'][1],math.sqrt(511)*config['energy']['resolution'],atten,sumup_emission,scatter_position.shape[0],
+                    u_map.data,np.array(u_map.size,dtype=np.float32),np.array(u_map.data.shape,dtype=np.int32),lors_part,scatter,scale)
     total_scatter = np.zeros((int(scanner.nb_detectors*(scanner.nb_detectors-1)/2),1),dtype=np.float32)
-    total_scatter[index] = scatter
-    return total_scatter*0.3/np.max(total_scatter)
+    total_scale = np.zeros((int(scanner.nb_detectors*(scanner.nb_detectors-1)/2),1),dtype=np.float32)
+    total_atten = np.zeros((int(scanner.nb_detectors*(scanner.nb_detectors-1)/2),1),dtype=np.float32)
+    # scatter = scatter*atten_lors
+    total_scatter[index] = scatter/np.sum(scatter)*np.sum(sinogram[index])*0.44
+    total_scale[index] = scale
+    total_atten[index] = atten_lors
+    return total_scatter,total_scale,total_atten
 
-# @cuda.jit
-# def loop_all_lors(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,scatter_position,crystal_position,low_energy,high_energy,resolution,atten,sumup_emission,num_scatter,u_map,size,shape,lors,scatter_ab):
-#     # scatter_ab = np.zeros((int(nb_detectors*(nb_detectors-1)/2),1))
-#     i = cuda.grid(1)
-#     if i <scatter_ab.shape[0]:
-#         a = int(lors[i,0])
-#         b = int(lors[i,1])
-#         scatter_ab[i,0] = loop_all_s(scatter_position,crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,sumup_emission[a*num_scatter:(a+1)*num_scatter],
-#         sumup_emission[b*num_scatter:(b+1)*num_scatter],atten[a*num_scatter:(a+1)*num_scatter],atten[b*num_scatter:(b+1)*num_scatter],nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,u_map,size,shape)
-#     # return scatter_ab
+
 @cuda.jit
-def loop_all_lors(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,scatter_position,crystal_position,low_energy,high_energy,resolution,atten,sumup_emission,num_scatter,u_map,size,shape,lors,scatter_ab):
+def loop_all_lors(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,scatter_position,crystal_position,low_energy,high_energy,resolution,atten,sumup_emission,num_scatter,u_map,size,shape,lors,scatter_ab,scale_ab):
     # scatter_ab = np.zeros((int(nb_detectors*(nb_detectors-1)/2),1))
     c, j = cuda.grid(2)
     i = 512 * 16 * c + j
     if i <scatter_ab.shape[0]:
         a = int(lors[i,0])
         b = int(lors[i,1])
-        scatter_ab[i,0] = loop_all_s(scatter_position,crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,sumup_emission[a*num_scatter:(a+1)*num_scatter],
-        sumup_emission[b*num_scatter:(b+1)*num_scatter],atten[a*num_scatter:(a+1)*num_scatter],atten[b*num_scatter:(b+1)*num_scatter],nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,u_map,size,shape)
+        scatter_ab[i,0] = (loop_all_s(scatter_position,crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,sumup_emission[a*num_scatter:(a+1)*num_scatter],
+        sumup_emission[b*num_scatter:(b+1)*num_scatter],atten[a*num_scatter:(a+1)*num_scatter],atten[b*num_scatter:(b+1)*num_scatter],nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,u_map,size,shape))
+        scale_ab[i,0] = get_scale(crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block)
+
+@cuda.jit(device=True)
+def get_scale(A,B,low_energy,high_energy,resolution,nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block):
+    efficiency_without_scatter = eff_without_scatter(low_energy,high_energy,resolution)
+    area = project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,A,B)
+    return 4*math.pi*(distance_a2b(A[0],A[1],A[2],B[0],B[1],B[2])/efficiency_without_scatter/area)**2
 
 
 @cuda.jit(device=True)
 def loop_all_s(scatter_position,A,B,low_energy,high_energy,resolution,sumup_emission_s2a,sumup_emission_s2b,atten_s2a,atten_s2b,nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,u_map,size,shape):    
     scatter_ab = 0
     efficiency_without_scatter = eff_without_scatter(low_energy,high_energy,resolution)
-    for i in range(scatter_position.shape[0]):
+    for i in range(int(scatter_position.shape[0])):
         S = scatter_position[i,:]
         cos_theta = get_scatter_cos_theta(A,S,B)
         scattered_energy = 511/(2-cos_theta)
-        I = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
-            atten_s2a[i]*atten_s2b[i]*scattered_energy/511*(sumup_emission_s2a[i]+sumup_emission_s2b[i]))
-        # Ib = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
-        #               atten_s2a[i]*atten_s2b[i]*scattered_energy/511*sumup_emission_s2b[i])
+        Ia = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
+            atten_s2a[i]*math.exp(math.log(atten_s2b[i])/scattered_energy*511)*sumup_emission_s2a[i])
+        Ib = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
+            math.exp(math.log(atten_s2a[i])/scattered_energy*511)*atten_s2b[i]*sumup_emission_s2b[i])
         scatter_ab += (project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,S,A)*project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,S,B)
-                      *fkn(A,S,B,u_map,size,shape,10.0)*I/4/math.pi/(distance_a2b(S[0],S[1],S[2],A[0],A[1],A[2]))**2/(distance_a2b(S[0],S[1],S[2],B[0],B[1],B[2]))**2)   
+                      *fkn(A,S,B,u_map,size,shape)*(Ia+Ib)/4/math.pi/(distance_a2b(S[0],S[1],S[2],A[0],A[1],A[2]))**2/(distance_a2b(S[0],S[1],S[2],B[0],B[1],B[2]))**2)   
     return scatter_ab
 
 @cuda.jit(device=True)

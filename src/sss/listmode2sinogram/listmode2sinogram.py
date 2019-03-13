@@ -55,18 +55,19 @@ def detectorid(scanner,events):
     id_event = position2detectorid(scanner,events)
     return change_id(id_event)
 
-def cal_sinogram(list_mode_data,scanner):
-    total_num_crystal = scanner.nb_rings*scanner.blocks.shape[2]*scanner.nb_detectors_per_ring
+@jit(nopython=True)
+def cal_sinogram(list_mode_data,nb_rings,grid_block_z,nb_detectors_per_ring):
+    total_num_crystal = nb_rings*grid_block_z*nb_detectors_per_ring
     weight = np.zeros((int(total_num_crystal*(total_num_crystal-1)/2),1))
     for i in range(int(list_mode_data.shape[0])):
         pos = int((list_mode_data[i,0]-1)*list_mode_data[i,0]/2+list_mode_data[i,1])
-        weight[pos] = weight[pos] + list_mode_data[i,2]
+        weight[pos] +=  list_mode_data[i,2]
     return weight
 
 @jit(nopython=True)
 def get_all_lors_id(total_num_crystal):
     # total_num_crystal = scanner.nb_rings*scanner.blocks[0].grid[2]*scanner.nb_detectors_per_ring
-    lors = np.zeros((int(total_num_crystal*(total_num_crystal-1)/2),2))
+    lors = np.zeros((int(total_num_crystal*(total_num_crystal-1)/2),2),dtype=np.int32)
     num = 0
     for i in range(total_num_crystal):
         for j in range(i):
@@ -78,7 +79,7 @@ def get_all_lors_id(total_num_crystal):
 def get_crystal_xy(grid_block,num_block,crystal_id,block_id,r_inner,size_block):
     size_crystal = size_block/grid_block
     angle_block = math.pi*2/num_block*block_id
-    center = np.hstack((((r_inner+10)*np.cos(angle_block)).reshape(block_id.size,1),((r_inner+10)*np.sin(angle_block)).reshape(block_id.size,1)))
+    center = np.hstack((((r_inner)*np.cos(angle_block)).reshape(block_id.size,1),((r_inner)*np.sin(angle_block)).reshape(block_id.size,1)))
     vector_tang = np.hstack((np.cos(angle_block+math.pi/2*np.ones_like(angle_block)).reshape(block_id.size,1),np.sin(angle_block+math.pi/2*np.ones_like(angle_block)).reshape(block_id.size,1)))
     dist_from_center = size_crystal[1]*(crystal_id-(grid_block[1]-1)/2*np.ones_like(crystal_id))
     return center+np.hstack((dist_from_center.reshape(dist_from_center.size,1),dist_from_center.reshape(dist_from_center.size,1)))*vector_tang
@@ -102,7 +103,7 @@ def lm2sino(filename,scanner):
     listmode_pos = np.hstack((load_file['fst'],load_file['snd']))
     listmode_id = detectorid(scanner,listmode_pos) 
     listmode_data = np.hstack((listmode_id,load_file['weight'].reshape(-1,1)))
-    return cal_sinogram(listmode_data,scanner)
+    return cal_sinogram(listmode_data,scanner.nb_rings,scanner.blocks.shape[2],scanner.nb_detectors_per_ring)
 
 def sino2lm(scanner,sinogram,lors):
     index = np.where(sinogram>0)[0]
