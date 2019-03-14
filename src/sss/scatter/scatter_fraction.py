@@ -41,9 +41,9 @@ def loop_all_lors(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,scatter_po
     if i <scatter_ab.shape[0]:
         a = int(lors[i,0])
         b = int(lors[i,1])
-        scatter_ab[i,0] = (loop_all_s(scatter_position,crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,
+        scatter_ab[i,0] = loop_all_s(scatter_position,crystal_position[a,:],crystal_position[b,:],low_energy,high_energy,resolution,
             sumup_emission[a*num_scatter:(a+1)*num_scatter],sumup_emission[b*num_scatter:(b+1)*num_scatter],atten[a*num_scatter:(a+1)*num_scatter],
-            atten[b*num_scatter:(b+1)*num_scatter],nb_detectors_per_ring,nb_blocks_per_ring,grid_block,u_map,size,shape))
+            atten[b*num_scatter:(b+1)*num_scatter],nb_detectors_per_ring,nb_blocks_per_ring,grid_block,u_map,size,shape)
         scale_ab[i,0] = get_scale(crystal_position[a,:],crystal_position[b,:],nb_detectors_per_ring,nb_blocks_per_ring,grid_block)
 
 @cuda.jit(device=True)

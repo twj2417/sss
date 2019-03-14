@@ -77,7 +77,6 @@ def cal_sinogram(list_mode_data,nb_rings,grid_block_z,nb_detectors_per_ring):
 
 @jit(nopython=True)
 def get_all_lors_id(total_num_crystal):
-    # total_num_crystal = scanner.nb_rings*scanner.blocks[0].grid[2]*scanner.nb_detectors_per_ring
     lors = np.zeros((int(total_num_crystal*(total_num_crystal-1)/2),2),dtype=np.int32)
     num = 0
     for i in range(total_num_crystal):
