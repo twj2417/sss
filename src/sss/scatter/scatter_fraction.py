@@ -32,14 +32,16 @@ def scatter_fraction(config,sinogram,lors,scanner):
                     np.array(scanner.blocks.size,dtype=np.int32),scatter_position,crystal_position,config['energy']['window'][0],
                     config['energy']['window'][1],math.sqrt(511)*config['energy']['resolution'],atten,sumup_emission,scatter_position.shape[0],
                     u_map.data,np.array(u_map.size,dtype=np.float32),np.array(u_map.data.shape,dtype=np.int32),lors_part,scatter,scale)
+    efficiency_without_scatter = eff_without_scatter(config['energy']['window'][0],config['energy']['window'][1],
+                    math.sqrt(511)*config['energy']['resolution'])*5/(1022*math.pi)**0.5/config['energy']['resolution']
     end2 = time.time()
     print(end2-start2)
     total_scatter = np.zeros((int(scanner.nb_detectors*(scanner.nb_detectors-1)/2),1),dtype=np.float32)
     total_scale = np.zeros((int(scanner.nb_detectors*(scanner.nb_detectors-1)/2),1),dtype=np.float32)
     total_atten = np.zeros((int(scanner.nb_detectors*(scanner.nb_detectors-1)/2),1),dtype=np.float32)
     # scatter = scatter*atten_lors
-    total_scatter[index] = scatter/np.sum(scatter)*np.sum(sinogram[index])*0.44
-    total_scale[index] = scale
+    total_scatter[index] = scatter/np.sum(scatter)*np.sum(sinogram[index])*0.44*efficiency_without_scatter
+    total_scale[index] = scale/efficiency_without_scatter**2
     total_atten[index] = atten_lors
     return total_scatter,total_scale,total_atten
 
@@ -61,30 +63,26 @@ def loop_all_lors(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block
 
 @cuda.jit(device=True)
 def get_scale(A,B,low_energy,high_energy,resolution,nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block):
-    efficiency_without_scatter = eff_without_scatter(low_energy,high_energy,resolution)
     area = project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,A,B)*size_block[1]*size_block[2]/grid_block[1]/grid_block[2]
-    return 4*math.pi*(distance_a2b(A[0],A[1],A[2],B[0],B[1],B[2])/efficiency_without_scatter/area)**2
+    return 4*math.pi*(distance_a2b(A[0],A[1],A[2],B[0],B[1],B[2])/area)**2
 
 
 @cuda.jit(device=True)
 def loop_all_s(scatter_position,A,B,low_energy,high_energy,resolution,sumup_emission_s2a,sumup_emission_s2b,atten_s2a,atten_s2b,
                 nb_detectors_per_ring,nb_blocks_per_ring,grid_block,size_block,u_map,size,shape):    
     scatter_ab = 0
-    efficiency_without_scatter = eff_without_scatter(low_energy,high_energy,resolution)
     for i in range(int(scatter_position.shape[0])):
         S = scatter_position[i,:]
         cos_theta = get_scatter_cos_theta(A,S,B)
         scattered_energy = 511/(2-cos_theta)
-        Ia = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
-            atten_s2a[i]*math.exp(math.log(atten_s2b[i])/scattered_energy*511)*sumup_emission_s2a[i])
-        Ib = (efficiency_without_scatter*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
-            math.exp(math.log(atten_s2a[i])/scattered_energy*511)*atten_s2b[i]*sumup_emission_s2b[i])
-        scatter_ab += (project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,S,A)*
+        Ia = (atten_s2a[i]*math.exp(math.log(atten_s2b[i])/scattered_energy*511)*sumup_emission_s2a[i])
+        Ib = (math.exp(math.log(atten_s2a[i])/scattered_energy*511)*atten_s2b[i]*sumup_emission_s2b[i])
+        scatter_ab += (project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,S,A)*eff_with_scatter(low_energy,high_energy,scattered_energy,resolution)*
             project_area(nb_detectors_per_ring,nb_blocks_per_ring,grid_block,S,B)*fkn(A,S,B,u_map,size,shape)*(Ia+Ib)/4/math.pi/
             (distance_a2b(S[0],S[1],S[2],A[0],A[1],A[2]))**2/(distance_a2b(S[0],S[1],S[2],B[0],B[1],B[2]))**2)   
-    return scatter_ab*(size_block[1]*size_block[2]/grid_block[1]/grid_block[2])**2
+    return scatter_ab*(size_block[1]*size_block[2]/grid_block[1]/grid_block[2])**2*5/(2*math.pi)**0.5/resolution
 
-@cuda.jit(device=True)
+@jit(nopython=True)
 def eff_without_scatter(low_energy_window,high_energy_window,energy_resolution):
     """
     calulate detection efficiency according to lors energy with no scatter
@@ -92,7 +90,7 @@ def eff_without_scatter(low_energy_window,high_energy_window,energy_resolution):
     eff = 0
     for i in range(low_energy_window,high_energy_window,5):
         eff += math.exp(-(float(i)-511)**2/2/energy_resolution**2)
-    return eff*5/(2*math.pi)**0.5/energy_resolution
+    return eff
 
 @cuda.jit(device=True)
 def eff_with_scatter(low_energy_window,high_energy_window,scattered_energy,energy_resolution):
@@ -102,7 +100,7 @@ def eff_with_scatter(low_energy_window,high_energy_window,scattered_energy,energ
     eff = 0
     for i in range(low_energy_window,high_energy_window,5):
         eff += math.exp(-(float(i)-scattered_energy)**2/2/energy_resolution**2)
-    return eff*5/(2*math.pi)**0.5/energy_resolution
+    return eff
     
 
 @cuda.jit(device=True)
