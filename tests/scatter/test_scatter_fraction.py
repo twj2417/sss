@@ -1,5 +1,5 @@
-from sss.scatter.scatter_fraction import scatter_fraction,loop_all_s,eff_with_scatter,eff_without_scatter,project_area,get_block_theta,distance_a2b
-from srf.external.stir.function import get_scanner
+from sss.scatter.scatter_fraction import scatter_fraction,loop_all_s,eff_with_scatter,eff_without_scatter,project_area,get_block_theta,distance_a2b,get_scanner
+# from srf.external.stir.function import get_scanner
 import numpy as np
 import pytest
 
@@ -37,12 +37,12 @@ def test_project_area():
     scanner = make_scanner()
     pa = np.array([0,0,0])
     pb = np.array([434.5,0,0])
-    assert project_area(scanner,pa,pb) == 2840.89
+    assert project_area(scanner.nb_detectors_per_ring,scanner.nb_blocks_per_ring,scanner.blocks.shape,scanner.blocks.size,pa,pb) == 2840.89
 
 def test_get_block_theta():
     scanner = make_scanner()
     p = np.array([430.3,22.2,10.1])
-    theta = get_block_theta(scanner,p)
+    theta = get_block_theta(scanner.nb_detectors_per_ring,scanner.nb_blocks_per_ring,scanner.blocks.shape,p)
     assert theta == 0
 
 

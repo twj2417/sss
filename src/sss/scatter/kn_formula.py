@@ -2,17 +2,18 @@ from numba import jit,cuda
 import math
 
 @cuda.jit(device=True)
-def fkn(A,S,B,u_map,size,shape,Z):
+def fkn(A,S,B,u_map,size,shape):
     """
     Differential cross section:A to S, and scattering to B
     """
     cos_asb = get_scatter_cos_theta(A,S,B)
-    grid_S0 = int(S[0]*shape[0]/size[0])
-    grid_S1 = int(S[1]*shape[1]/size[1])
-    grid_S2 = int(S[2]*shape[2]/size[2])
-    differential_value = (1/(2-cos_asb)**2*((1+cos_asb**2)/2
-                          +(1-cos_asb)**2/2/(2-cos_asb)**2))
-    sigma = math.pi*Z*(52/9-3*math.log(3))
+    grid_S0 = int((S[0]/size[0]+0.5)*shape[0])
+    grid_S1 = int((S[1]/size[1]+0.5)*shape[1])
+    grid_S2 = int((S[2]/size[2]+0.5)*shape[2])
+    differential_value = (1.0/(2.0-cos_asb)**2*((1.0+cos_asb**2)/2.0
+                          +(1.0-cos_asb)**2/2.0/(2.0-cos_asb)))
+    Z = u_map[grid_S0,grid_S1,grid_S2]*1000+0.4
+    sigma = math.pi*Z*(40.0/9.0-3.0*math.log(3.0))
     return differential_value/sigma*u_map[grid_S0,grid_S1,grid_S2]
 
 @cuda.jit(device=True)
