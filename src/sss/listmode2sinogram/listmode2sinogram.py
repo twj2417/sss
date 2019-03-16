@@ -102,8 +102,8 @@ def get_crystal_z(ring_id,grid_block,size_block,nb_rings):
     return dist_from_center
 
 def get_center(scanner,crystal_id_whole_scanner):
-    ring_id = np.floor(crystal_id_whole_scanner/scanner.nb_detectors_per_ring)
-    crystal_per_ring_id = crystal_id_whole_scanner - ring_id*scanner.nb_detectors_per_ring
+    ring_id = np.floor(crystal_id_whole_scanner/scanner.nb_blocks_per_ring/scanner.blocks.shape[1])
+    crystal_per_ring_id = crystal_id_whole_scanner - ring_id*scanner.nb_blocks_per_ring*scanner.blocks.shape[1]
     block_id = crystal_per_ring_id//scanner.blocks.shape[1]
     crystal_id = crystal_per_ring_id%scanner.blocks.shape[1]
     center_xy = get_crystal_xy(np.array(scanner.blocks.shape),scanner.nb_blocks_per_ring,crystal_id,block_id,scanner.inner_radius,
@@ -116,11 +116,11 @@ def lm2sino(filename,scanner):
     load_file = load_h5(filename)
     listmode_pos = np.hstack((load_file['fst'],load_file['snd']))
     listmode_id = np.zeros((listmode_pos.shape[0],2),dtype=np.float32)
-    detectorid[(512,512),(16,16)](scanner.nb_detectors_per_ring,scanner.nb_blocks_per_ring,scanner.nb_rings,scanner.inner_radius,
-            scanner.outer_radius,scanner.blocks.size[2]*scanner.nb_rings,np.array(scanner.blocks.shape,dtype=np.int32),
+    detectorid[(512,512),(16,16)](scanner.nb_blocks_per_ring*scanner.blocks.shape[1],scanner.nb_blocks_per_ring,scanner.nb_rings,scanner.inner_radius,
+            scanner.outer_radius,scanner.axial_length,np.array(scanner.blocks.shape,dtype=np.int32),
             np.array(scanner.blocks.size,dtype=np.float32),listmode_pos,listmode_id) 
     listmode_data = np.hstack((listmode_id,load_file['weight'].reshape(-1,1)))
-    return cal_sinogram(listmode_data,scanner.nb_rings,scanner.blocks.shape[2],scanner.nb_detectors_per_ring)
+    return cal_sinogram(listmode_data,scanner.nb_rings,scanner.blocks.shape[2],scanner.nb_blocks_per_ring*scanner.blocks.shape[1])
 
 def sino2lm(scanner,sinogram,lors):
     index = np.where(sinogram>0)[0]
@@ -128,7 +128,6 @@ def sino2lm(scanner,sinogram,lors):
     all_position[:,:3] = get_center(scanner,lors[index,0])
     all_position[:,3:6] = get_center(scanner,lors[index,1])
     return np.hstack((all_position,sinogram[index].reshape(-1,1)))
-
 
 
 __all__ = []

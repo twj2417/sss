@@ -20,17 +20,17 @@ def scatter_fraction(config,index,lors,scanner):
     sumup_emission = pre_sumup_of_emission(emission_image,crystal_position,scatter_position,config)
     atten = pre_atten(u_map,crystal_position,scatter_position,config)  
     atten_lors = pre_lors_atten(u_map,crystal_position[lors[index,0]],crystal_position[lors[index,1]],config).reshape(-1,1)  
-    scatter = np.zeros((index.size,1),dtype=np.float32)
-    scale = np.zeros((index.size,1),dtype=np.float32)
-    lors_part = lors[index,:]
-    loop_all_lors[(512,512),(16,16)](scanner.nb_detectors_per_ring,scanner.nb_blocks_per_ring,np.array(scanner.blocks.shape,dtype=np.int32),
-                    scatter_position,crystal_position,config['energy']['window'][0],config['energy']['window'][1],math.sqrt(511)*config['energy']['resolution'],
-                    atten,sumup_emission,scatter_position.shape[0],u_map.data,np.array(u_map.size,dtype=np.float32),np.array(u_map.data.shape,dtype=np.int32),
-                    lors_part,scatter,scale)
-    efficiency_without_scatter = eff_without_scatter(config['energy']['window'][0],config['energy']['window'][1],
-                    math.sqrt(511)*config['energy']['resolution'])*5/(1022*math.pi)**0.5/config['energy']['resolution']
-    scatter = scatter*efficiency_without_scatter*(scanner.blocks.size[1]*scanner.blocks.size[2]/scanner.blocks.shape[1]/scanner.blocks.shape[2])**2*5/(1022*math.pi)**0.5/config['energy']['resolution']/4/math.pi
-    return scatter,scale,atten_lors
+    # scatter = np.zeros((index.size,1),dtype=np.float32)
+    # scale = np.zeros((index.size,1),dtype=np.float32)
+    # lors_part = lors[index,:]
+    # loop_all_lors[(512,512),(16,16)](scanner.blocks_per_ring*scanner.blocks.shape[1],scanner.nb_blocks_per_ring,np.array(scanner.blocks.shape,dtype=np.int32),
+    #                 scatter_position,crystal_position,config['energy']['window'][0],config['energy']['window'][1],math.sqrt(511)*config['energy']['resolution'],
+    #                 atten,sumup_emission,scatter_position.shape[0],u_map.data,np.array(u_map.size,dtype=np.float32),np.array(u_map.data.shape,dtype=np.int32),
+    #                 lors_part,scatter,scale)
+    # efficiency_without_scatter = eff_without_scatter(config['energy']['window'][0],config['energy']['window'][1],
+    #                 math.sqrt(511)*config['energy']['resolution'])*5/(1022*math.pi)**0.5/config['energy']['resolution']
+    # scatter = scatter*efficiency_without_scatter*(scanner.blocks.size[1]*scanner.blocks.size[2]/scanner.blocks.shape[1]/scanner.blocks.shape[2])**2*5/(1022*math.pi)**0.5/config['energy']['resolution']/4/math.pi
+    return atten_lors
 
 
 @cuda.jit
