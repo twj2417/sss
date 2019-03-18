@@ -1,4 +1,3 @@
-# from srf.data import Image
 import numpy as np
 import math
 from dxl.learn.core import Session, SubgraphMakerTable
@@ -11,15 +10,6 @@ from .listmode2sinogram.listmode2sinogram import get_center
 import sys
 
 def pre_all_scatter_position(emission_image):
-    # position = np.zeros((5000,3),dtype=np.float32)
-    # n = 0
-    # for x in range(-40,40,10):
-    #     for y in range(-40,40,10):
-    #         for z in range(-10,10,10):
-    #             if x**2+y**2<40**2:
-    #                 position[n,:] = np.array([x,y,z])
-    #                 n = n+1
-    # return position[:n,:]
     size_voxel = emission_image.size/emission_image.shape
     step = np.floor(50/size_voxel)
     time = np.floor(emission_image.shape/step)
