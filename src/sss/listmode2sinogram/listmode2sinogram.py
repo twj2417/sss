@@ -24,12 +24,12 @@ def block_id(event,nb_detectors_per_ring,block_grid_y,num_block):
 @cuda.jit(device=True)
 def crystal_id(nb_detectors_per_ring,nb_blocks_per_ring,inner_radius,outer_radius,grid_block,size_block,event):
     id_block = block_id(event,nb_detectors_per_ring,grid_block[1],nb_blocks_per_ring)
-    block_center_x = (inner_radius+outer_radius)/2*math.cos(2*math.pi*id_block/nb_blocks_per_ring)
-    block_center_y = (inner_radius+outer_radius)/2*math.sin(2*math.pi*id_block/nb_blocks_per_ring)
     theta_block = 2*math.pi*id_block/nb_blocks_per_ring
+    block_center_x = (inner_radius+outer_radius)/2*math.cos(theta_block)
+    block_center_y = (inner_radius+outer_radius)/2*math.sin(theta_block)    
     dist = (block_center_x-event[0])*math.cos(theta_block)+(block_center_y-event[1])*math.sin(theta_block)
     pro_point_x = dist*math.cos(theta_block)+event[0]
-    pro_point_y = dist*math.sin(theta_block)+event[1]
+    pro_point_y = dist*math.sin(theta_block)+event[1]    
     edge_block_x = block_center_x - math.cos(theta_block+math.pi/2)*size_block[1]/2
     edge_block_y = block_center_y - math.sin(theta_block+math.pi/2)*size_block[1]/2
     id_crystal = int(norm(pro_point_x-edge_block_x,pro_point_y-edge_block_y)/size_block[1]*grid_block[1])
@@ -37,7 +37,7 @@ def crystal_id(nb_detectors_per_ring,nb_blocks_per_ring,inner_radius,outer_radiu
     
 @cuda.jit(device=True)
 def ring_id(nb_rings,axial_length,grid_block,size_block,event_z):
-    return int((event_z+size_block[2]*nb_rings/2)/axial_length*nb_rings*grid_block[1])
+    return int((event_z+nb_rings*size_block[2]/2)/axial_length*nb_rings*grid_block[2])
 
 @cuda.jit(device=True)
 def position2detectorid(nb_detectors_per_ring,nb_blocks_per_ring,nb_rings,inner_radius,outer_radius,axial_length,grid_block,
@@ -72,7 +72,7 @@ def cal_sinogram(list_mode_data,nb_rings,grid_block_z,nb_detectors_per_ring):
     weight = np.zeros((int(total_num_crystal*(total_num_crystal-1)/2),1))
     for i in range(int(list_mode_data.shape[0])):
         pos = int((list_mode_data[i,0]-1)*list_mode_data[i,0]/2+list_mode_data[i,1])
-        weight[pos] +=  list_mode_data[i,2]
+        weight[pos] = weight[pos] + list_mode_data[i,2]
     return weight
 
 @jit(nopython=True)
@@ -112,10 +112,9 @@ def get_center(scanner,crystal_id_whole_scanner):
     return np.hstack((center_xy,center_z.reshape(center_z.size,1)))
 
 @jit
-def lm2sino(filename,scanner):
-    load_file = load_h5(filename)
+def lm2sino(load_file,scanner):
     listmode_pos = np.hstack((load_file['fst'],load_file['snd']))
-    listmode_id = np.zeros((listmode_pos.shape[0],2),dtype=np.float32)
+    listmode_id = np.zeros((listmode_pos.shape[0],2),dtype=np.int32)
     detectorid[(512,512),(16,16)](scanner.nb_blocks_per_ring*scanner.blocks.shape[1],scanner.nb_blocks_per_ring,scanner.nb_rings,scanner.inner_radius,
             scanner.outer_radius,scanner.axial_length,np.array(scanner.blocks.shape,dtype=np.int32),
             np.array(scanner.blocks.size,dtype=np.float32),listmode_pos,listmode_id) 
@@ -128,7 +127,6 @@ def sino2lm(scanner,sinogram,lors):
     all_position[:,:3] = get_center(scanner,lors[index,0])
     all_position[:,3:6] = get_center(scanner,lors[index,1])
     return np.hstack((all_position,sinogram[index].reshape(-1,1)))
-
 
 __all__ = []
 
