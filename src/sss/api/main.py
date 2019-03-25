@@ -1,12 +1,10 @@
-from ..io.load_data import get_data
 from ..listmode2sinogram.listmode2sinogram import lm2sino,sino2lm,get_all_lors_id,load_h5,save_h5
 from ..scatter import get_scatter_fraction,get_scanner
 import numpy as np
 import time
 import sys
 np.seterr(divide='ignore', invalid='ignore')
-# from srf.external.stir.function import get_scanner
-# from srf.io.listmode import load_h5,save_h5
+
 
 def scatter_correction(config):
     load_file = load_h5(config['listmode']['path'])

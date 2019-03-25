@@ -1,15 +1,9 @@
 import math
 import numpy as np
-from scipy import integrate
 from .kn_formula import get_scatter_cos_theta,fkn
 from ..preprocess import pre_all_scatter_position,pre_atten,pre_lors_atten,pre_sumup_of_emission,get_all_crystal_position,get_image
-# from srf.external.stir.function import get_scanner
-from ..io import get_data
-from scipy.special import ndtr
 from numba import jit,cuda
 import srfnef as nef
-import time
-import sys
 
 @jit
 def scatter_fraction(config,index,lors,scanner):
