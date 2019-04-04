@@ -12,6 +12,10 @@ setup(name='single scatter simulation',
       install_requires=[
           'click',
           'numpy',
+          'numba',
+          'h5py',
+          'typing',
+          'srfnef'
       ],
       entry_points="""
             [console_scripts]

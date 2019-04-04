@@ -1,15 +1,9 @@
 import math
 import numpy as np
-from scipy import integrate
 from .kn_formula import get_scatter_cos_theta,fkn
 from ..preprocess import pre_all_scatter_position,pre_atten,pre_lors_atten,pre_sumup_of_emission,get_all_crystal_position,get_image
-# from srf.external.stir.function import get_scanner
-from ..io import get_data
-from scipy.special import ndtr
 from numba import jit,cuda
 import srfnef as nef
-import time
-import sys
 
 @jit
 def scatter_fraction(config,index,lors,scanner):
@@ -117,7 +111,7 @@ def distance_a2b(x1,y1,z1,x2,y2,z2):
 def get_scanner(config):
     block = nef.Block(np.array(config['block']['size']),
                   np.array(config['block']['grid']))
-    return nef.PETCylindricalScanner(config['ring']['inner_radius'],
+    return nef.PetCylindricalScanner(config['ring']['inner_radius'],
                         config['ring']['outer_radius'],
                         config['ring']['nb_rings'],
                         config['ring']['nb_blocks_per_ring'],

@@ -2,7 +2,6 @@ import click
 import json
 from ..api.main import scatter_correction
 from dxl.core.debug import enter_debug
-# from srf.external.stir.function import get_scanner
 
 enter_debug()
 

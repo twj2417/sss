@@ -19,7 +19,7 @@ def block_id(event,nb_detectors_per_ring,block_grid_y,num_block):
     if event[1]<0:
         theta_event = 360-theta_event
     fixed_theta = (theta_event+180/nb_detectors_per_ring*block_grid_y)%360
-    return math.floor(fixed_theta/360*num_block)
+    return int(fixed_theta/360*num_block)
 
 @cuda.jit(device=True)
 def crystal_id(nb_detectors_per_ring,nb_blocks_per_ring,inner_radius,outer_radius,grid_block,size_block,event):
