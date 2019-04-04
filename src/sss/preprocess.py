@@ -18,30 +18,25 @@ def pre_all_scatter_position(emission_image):
     return position
 
 def pre_sumup_of_emission(emission_image,p1,p2,config):
-    projector = nef.projector_picker('siddon')('gpu')
     lors = get_lors(p1,p2)
+    projector = nef.Projector()
     value = projector(emission_image,lors).data
     len_lors = np.power(lors.data[:,3]-lors.data[:,0],2)+np.power(lors.data[:,4]-lors.data[:,1],2)+np.power(lors.data[:,5]-lors.data[:,2],2)
-    pixel_size = emission_image.size[0]/emission_image.data.shape[0]
-    return value*len_lors*2
+    return value*len_lors
 
 def pre_atten(transmission_image,p1,p2,config):
-    projector = nef.projector_picker('siddon')('gpu')
     lors = get_lors(p1,p2)
-    value = projector(transmission_image,lors).data
-    len_lors = np.power(lors.data[:,3]-lors.data[:,0],2)+np.power(lors.data[:,4]-lors.data[:,1],2)+np.power(lors.data[:,5]-lors.data[:,2],2)
-    pixel_size = transmission_image.size[0]/transmission_image.data.shape[0]
-    weight = np.exp(-value*len_lors*2)
-    return weight
+    projector = nef.Projector()
+    u_map_projector = nef.correction.UmapProjector(projector)
+    value = u_map_projector(transmission_image,lors).data
+    return value
 
 def pre_lors_atten(transmission_image,p1,p2,config):
-    projector = nef.projector_picker('siddon')('gpu')
     lors = np.hstack((np.hstack((p1,p2)),np.ones((p1.shape[0],1),dtype=np.float32)))
-    value = projector(transmission_image,nef.LORs(lors)).data
-    len_lors = np.power(lors[:,3]-lors[:,0],2)+np.power(lors[:,4]-lors[:,1],2)+np.power(lors[:,5]-lors[:,2],2)
-    pixel_size = transmission_image.size[0]/transmission_image.data.shape[0]
-    weight = np.exp(-value*len_lors*2)
-    return weight
+    projector = nef.Projector()
+    u_map_projector = nef.correction.UmapProjector(projector)
+    value = u_map_projector(transmission_image*1.2,nef.Lors(lors)).data
+    return value
 
 def get_lors(P1,P2):
     lors = np.ones((P1.shape[0]*P2.shape[0],7),dtype=np.float32)
@@ -51,7 +46,7 @@ def get_lors(P1,P2):
     lors[:,3] = np.tile(P2[:,0],P1.shape[0])
     lors[:,4] = np.tile(P2[:,1],P1.shape[0])
     lors[:,5] = np.tile(P2[:,2],P1.shape[0])
-    return nef.LORs(lors)
+    return nef.Lors(lors)
 
 def get_coordinate(emission_image,step,x,y,z):
     size_pixel = emission_image.size/emission_image.shape

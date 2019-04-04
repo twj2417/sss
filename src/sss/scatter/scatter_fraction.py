@@ -111,7 +111,7 @@ def distance_a2b(x1,y1,z1,x2,y2,z2):
 def get_scanner(config):
     block = nef.Block(np.array(config['block']['size']),
                   np.array(config['block']['grid']))
-    return nef.PETCylindricalScanner(config['ring']['inner_radius'],
+    return nef.PetCylindricalScanner(config['ring']['inner_radius'],
                         config['ring']['outer_radius'],
                         config['ring']['nb_rings'],
                         config['ring']['nb_blocks_per_ring'],
